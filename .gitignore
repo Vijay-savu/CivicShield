@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+backend/.env
+backend/node_modules/
+backend/uploads/
+backend/server.log
+backend/server-error.log
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+*.log
+compass-connections.json
+.DS_Store
+Thumbs.db
