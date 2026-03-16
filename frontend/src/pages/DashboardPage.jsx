@@ -4,12 +4,6 @@ import AppShell from "../components/AppShell";
 import { useAuth } from "../context/AuthContext";
 import { schemeConfig } from "../data/portalConfig";
 import { getDocuments } from "../services/documentService";
-import {
-  getGatewayAvailability,
-  getGatewayBlueprint,
-  getGatewayStatus,
-  getSecurityPosture,
-} from "../services/gatewayService";
 import { getNotifications } from "../services/notificationService";
 import { getRecords } from "../services/recordService";
 import { getSchemes } from "../services/schemeService";
@@ -30,35 +24,12 @@ const getDisplayName = (user) => {
   return user?.name?.replace(/\bcitizen\b/gi, "").trim() || user?.email || "Vijay";
 };
 
-const innovationSignals = [
-  { label: "Zero Trust", detail: "JWT + device binding + request validation" },
-  { label: "Tamper Ledger", detail: "SHA-256 chain verifies document integrity" },
-  { label: "OCR Verification", detail: "Income and identity extracted from uploads" },
-  { label: "Degraded Mode", detail: "One service can fail while others continue" },
-];
-
-const fallbackBlueprint = [
-  "Citizen Portal",
-  "API Gateway",
-  "Auth Service",
-  "Document Service",
-  "Verification Service",
-  "Ledger Service",
-  "MongoDB",
-];
-
 function DashboardPage() {
   const { user } = useAuth();
   const [stats, setStats] = useState({
     documents: 0,
     alerts: 0,
     applications: 0,
-  });
-  const [platform, setPlatform] = useState({
-    services: [],
-    availability: null,
-    securityLayers: [],
-    blueprint: fallbackBlueprint,
   });
   const [featuredServices, setFeaturedServices] = useState(
     Object.entries(schemeConfig).map(([schemeName, config], index) => ({
@@ -75,29 +46,17 @@ function DashboardPage() {
   useEffect(() => {
     const loadDashboard = async () => {
       try {
-        const [records, notifications, documents, gatewayStatus, availabilityData, securityPosture, blueprint, schemes] =
-          await Promise.all([
-            getRecords(),
-            getNotifications(),
-            getDocuments(),
-            getGatewayStatus(),
-            getGatewayAvailability(),
-            getSecurityPosture(),
-            getGatewayBlueprint(),
-            getSchemes(),
-          ]);
+        const [records, notifications, documents, schemes] = await Promise.all([
+          getRecords(),
+          getNotifications(),
+          getDocuments(),
+          getSchemes(),
+        ]);
 
         setStats({
           documents: documents.length,
           alerts: notifications.filter((notification) => !notification.read).length,
           applications: records.length,
-        });
-
-        setPlatform({
-          services: gatewayStatus?.services || [],
-          availability: availabilityData?.availability || gatewayStatus?.availability || null,
-          securityLayers: securityPosture?.layers || [],
-          blueprint: blueprint?.flow?.length ? blueprint.flow : fallbackBlueprint,
         });
         setFeaturedServices(
           (schemes.length ? schemes : Object.entries(schemeConfig).map(([name, config]) => ({ name, ...config }))).map(
@@ -114,12 +73,6 @@ function DashboardPage() {
         );
       } catch (error) {
         setStats({ documents: 0, alerts: 0, applications: 0 });
-        setPlatform({
-          services: [],
-          availability: null,
-          securityLayers: [],
-          blueprint: fallbackBlueprint,
-        });
         setFeaturedServices(
           Object.entries(schemeConfig).map(([schemeName, config], index) => ({
             title: schemeName,
@@ -137,39 +90,15 @@ function DashboardPage() {
     loadDashboard();
   }, []);
 
-  const degradedServices = platform.services.filter(
-    (service) => service?.protection?.isolated || service?.circuitBreaker?.isOpen
-  ).length;
-  const activeServices = platform.services.length - degradedServices;
-  const healthyNodes =
-    platform.availability?.loadBalancer?.nodes?.filter((node) => node.status === "healthy").length || 0;
-  const totalNodes = platform.availability?.loadBalancer?.nodes?.length || 0;
-
   return (
     <AppShell
-      title="Citizen Services Command Center"
-      subtitle="Documents, schemes, integrity checks, and platform readiness from one verified portal."
+      title="Citizen Services"
+      subtitle=""
     >
       <section className="overflow-hidden rounded-[32px] border border-blue-100 bg-white shadow-[0_18px_42px_rgba(15,23,42,0.08)]">
         <div className="grid gap-6 bg-[linear-gradient(140deg,rgba(30,58,138,0.1),rgba(59,130,246,0.04))] px-6 py-7 lg:grid-cols-[1.45fr_0.75fr] lg:px-8">
           <div>
-            <div className="portal-ribbon">Secure Digital Governance</div>
             <h2 className="mt-4 text-3xl font-bold tracking-tight text-slate-900">Welcome, {getDisplayName(user)}</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-              CivicShield combines verified document storage, scheme automation, tamper-evident integrity, and
-              resilient service delivery in a single citizen portal.
-            </p>
-            <div className="mt-5 flex flex-wrap gap-3">
-              {innovationSignals.map((signal) => (
-                <div
-                  key={signal.label}
-                  className="rounded-2xl border border-blue-100 bg-white/80 px-4 py-3 shadow-sm"
-                >
-                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">{signal.label}</div>
-                  <div className="mt-1 text-sm text-slate-600">{signal.detail}</div>
-                </div>
-              ))}
-            </div>
           </div>
 
           <div className="grid gap-3">
@@ -185,94 +114,18 @@ function DashboardPage() {
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div className="rounded-3xl border border-slate-200 bg-white p-4">
-                <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Services Up</div>
-                <div className="mt-2 text-2xl font-bold text-emerald-700">{activeServices || 0}</div>
+                <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Schemes</div>
+                <div className="mt-2 text-2xl font-bold text-emerald-700">{featuredServices.length}</div>
               </div>
               <div className="rounded-3xl border border-slate-200 bg-white p-4">
-                <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Security</div>
-                <div className="mt-2 text-2xl font-bold text-slate-900">{platform.securityLayers.length}</div>
+                <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Status</div>
+                <div className="mt-2 text-2xl font-bold text-slate-900">Active</div>
               </div>
               <div className="rounded-3xl border border-slate-200 bg-white p-4">
                 <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Alerts</div>
                 <div className="mt-2 text-2xl font-bold text-rose-700">{stats.alerts}</div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="mt-8 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="page-section">
-          <div className="mb-5 flex items-center justify-between gap-4">
-            <div>
-              <div className="section-title">Architecture</div>
-              <h3 className="mt-2 text-2xl font-bold text-slate-900">Live Service Blueprint</h3>
-            </div>
-            <div className="rounded-2xl bg-blue-50 px-4 py-2 text-sm font-semibold text-[#1E3A8A]">
-              API Gateway Active
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            {platform.blueprint.map((step, index) => (
-              <div key={step} className="flex items-center gap-3">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
-                  {step}
-                </div>
-                {index < platform.blueprint.length - 1 ? (
-                  <div className="text-lg font-semibold text-blue-400">{">"}</div>
-                ) : null}
-              </div>
-            ))}
-          </div>
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-              <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Microservices</div>
-              <div className="mt-2 text-2xl font-bold text-slate-900">{platform.services.length || 0}</div>
-              <p className="mt-2 text-sm text-slate-600">Auth, documents, verification, tax, ledger, monitoring, and notifications.</p>
-            </div>
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-              <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Availability Mode</div>
-              <div className="mt-2 text-2xl font-bold text-slate-900">
-                {platform.availability?.status === "degraded" ? "Degraded" : "Healthy"}
-              </div>
-              <p className="mt-2 text-sm text-slate-600">
-                {platform.availability?.citizenImpact || "Platform status will appear here when the gateway responds."}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="page-section">
-          <div className="mb-5">
-            <div className="section-title">Platform Assurance</div>
-            <h3 className="mt-2 text-2xl font-bold text-slate-900">Security and Resilience</h3>
-          </div>
-          <div className="grid gap-3">
-            <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-4">
-              <div className="text-xs uppercase tracking-[0.22em] text-emerald-700">Service Health</div>
-              <div className="mt-2 text-2xl font-bold text-emerald-900">
-                {activeServices || 0}/{platform.services.length || 0} services available
-              </div>
-            </div>
-            <div className="rounded-3xl border border-slate-200 bg-white p-4">
-              <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Load Balancer</div>
-              <div className="mt-2 text-xl font-bold text-slate-900">
-                {healthyNodes}/{totalNodes || 0} nodes healthy
-              </div>
-            </div>
-            <div className="rounded-3xl border border-slate-200 bg-white p-4">
-              <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Defense Layers</div>
-              <div className="mt-2 text-xl font-bold text-slate-900">{platform.securityLayers.length} active controls</div>
-            </div>
-          </div>
-
-          <div className="mt-5 space-y-3">
-            {platform.securityLayers.slice(0, 4).map((layer) => (
-              <div key={layer.name} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="text-sm font-semibold text-slate-900">{layer.name}</div>
-                <div className="mt-1 text-sm text-slate-600">{layer.evidence}</div>
-              </div>
-            ))}
           </div>
         </div>
       </section>
