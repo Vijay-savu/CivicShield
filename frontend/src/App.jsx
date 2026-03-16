@@ -8,6 +8,7 @@ import MyRecordsPage from "./pages/MyRecordsPage";
 import ProfilePage from "./pages/ProfilePage";
 import RecordViewerPage from "./pages/RecordViewerPage";
 import SecurityAlertsPage from "./pages/SecurityAlertsPage";
+import TaxServicesPage from "./pages/TaxServicesPage";
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
         <Route path="/apply" element={<ApplySubsidyPage />} />
         <Route path="/my-applications" element={<MyRecordsPage />} />
         <Route path="/security-alerts" element={<SecurityAlertsPage />} />
+        <Route path="/tax-services" element={<TaxServicesPage />} />
         <Route path="/documents" element={<DocumentsPage />} />
       </Route>
 

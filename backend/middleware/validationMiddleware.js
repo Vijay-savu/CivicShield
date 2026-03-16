@@ -1,6 +1,6 @@
 const normalizeText = (value) => String(value ?? "").trim();
 const { DOCUMENT_TYPES } = require("../models/DocumentRecord");
-const { SUPPORTED_SCHEMES } = require("../utils/eligibilityEngine");
+const { SUPPORTED_SCHEMES, getRequiredDocumentsForScheme } = require("../utils/eligibilityEngine");
 
 const validateLogin = (req, res, next) => {
   const email = normalizeText(req.body.email).toLowerCase();
@@ -40,25 +40,31 @@ const validateApplicationCreate = (req, res, next) => {
   const aadhaarDocumentId = normalizeText(req.body.aadhaarDocumentId);
   const panDocumentId = normalizeText(req.body.panDocumentId);
   const incomeCertificateDocumentId = normalizeText(req.body.incomeCertificateDocumentId);
+  const birthCertificateDocumentId = normalizeText(req.body.birthCertificateDocumentId);
 
-  if (
-    !name ||
-    !address ||
-    !schemeType ||
-    !aadhaarDocumentId ||
-    !panDocumentId ||
-    !incomeCertificateDocumentId
-  ) {
-    return res
-      .status(400)
-      .json({
-        message:
-          "name, address, schemeType, aadhaarDocumentId, panDocumentId, and incomeCertificateDocumentId are required.",
-      });
+  if (!name || !address || !schemeType) {
+    return res.status(400).json({
+      message: "name, address, and schemeType are required.",
+    });
   }
 
   if (!SUPPORTED_SCHEMES.includes(schemeType)) {
     return res.status(400).json({ message: "Selected scheme is not supported." });
+  }
+
+  const requiredDocuments = getRequiredDocumentsForScheme(schemeType);
+  const fieldMap = {
+    aadhaar: aadhaarDocumentId,
+    pan: panDocumentId,
+    income_certificate: incomeCertificateDocumentId,
+    birth_certificate: birthCertificateDocumentId,
+  };
+  const missingRequiredFields = requiredDocuments.filter((documentType) => !fieldMap[documentType]);
+
+  if (missingRequiredFields.length) {
+    return res.status(400).json({
+      message: `Required uploaded documents are missing for this scheme: ${missingRequiredFields.join(", ")}.`,
+    });
   }
 
   req.validatedBody = {
@@ -69,6 +75,7 @@ const validateApplicationCreate = (req, res, next) => {
     aadhaarDocumentId,
     panDocumentId,
     incomeCertificateDocumentId,
+    birthCertificateDocumentId,
   };
   return next();
 };

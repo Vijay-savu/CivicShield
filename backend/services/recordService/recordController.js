@@ -1,19 +1,15 @@
 const ApplicationRecord = require("../../models/ApplicationRecord");
 const { DocumentRecord } = require("../../models/DocumentRecord");
-const GovernmentIncomeRecord = require("../../models/GovernmentIncomeRecord");
 const User = require("../../models/User");
 const { generateApplicationHash } = require("../../utils/hash");
 const { getApplicationIntegrity } = require("../../utils/applicationIntegrity");
-const { evaluateEligibility } = require("../../utils/eligibilityEngine");
+const { evaluateEligibility, getRequiredDocumentsForScheme } = require("../../utils/eligibilityEngine");
 const { logEvent } = require("../../utils/logEvent");
 const { notifyUser } = require("../../utils/notifyUser");
+const { appendLedgerEntry } = require("../../utils/tamperLedger");
+const { verifyUploadedDocumentIdentity } = require("../../utils/documentIdentity");
 
 const canAccess = (user, record) => record.createdBy.toString() === user.id;
-const extractAadhaarNumber = (text) => {
-  const normalized = String(text ?? "").replace(/\D/g, "");
-  const match = normalized.match(/\d{12}/);
-  return match ? match[0] : "";
-};
 
 const toResponse = (record, integrity) => {
   const citizenAlert = integrity.isTampered
@@ -21,9 +17,9 @@ const toResponse = (record, integrity) => {
       ? "Security alert: your uploaded document appears to be altered."
       : "Security alert: your application data no longer matches its stored integrity proof."
     : record.suspicious
-      ? "Suspicious application detected during automatic verification."
+      ? "Uploaded documents could not be linked to the same citizen during automatic verification."
       : record.mismatchDetected
-      ? "Eligibility alert: the OCR-extracted income does not match the verified government income record."
+      ? "Eligibility alert: uploaded document data could not be verified."
       : "";
 
   return {
@@ -59,6 +55,7 @@ const createApplication = async (req, res, next) => {
       aadhaarDocumentId,
       panDocumentId,
       incomeCertificateDocumentId,
+      birthCertificateDocumentId,
     } = req.validatedBody;
     const user = await User.findById(req.user.id).select("email");
 
@@ -66,8 +63,15 @@ const createApplication = async (req, res, next) => {
       return res.status(404).json({ message: "Citizen profile not found." });
     }
 
+    const requiredDocuments = getRequiredDocumentsForScheme(schemeType);
+    const requestedDocumentIds = [
+      aadhaarDocumentId,
+      panDocumentId,
+      incomeCertificateDocumentId,
+      birthCertificateDocumentId,
+    ].filter(Boolean);
     const documents = await DocumentRecord.find({
-      _id: { $in: [aadhaarDocumentId, panDocumentId, incomeCertificateDocumentId] },
+      _id: { $in: requestedDocumentIds },
       userId: req.user.id,
     });
 
@@ -75,28 +79,33 @@ const createApplication = async (req, res, next) => {
     const aadhaarDocument = documentMap.get(aadhaarDocumentId);
     const panDocument = documentMap.get(panDocumentId);
     const incomeCertificateDocument = documentMap.get(incomeCertificateDocumentId);
+    const birthCertificateDocument = documentMap.get(birthCertificateDocumentId);
 
-    if (!aadhaarDocument || aadhaarDocument.documentType !== "aadhaar") {
+    if (requiredDocuments.includes("aadhaar") && (!aadhaarDocument || aadhaarDocument.documentType !== "aadhaar")) {
       return res.status(400).json({ message: "A valid uploaded Aadhaar document is required." });
     }
 
-    if (!panDocument || panDocument.documentType !== "pan") {
+    if (requiredDocuments.includes("pan") && (!panDocument || panDocument.documentType !== "pan")) {
       return res.status(400).json({ message: "A valid uploaded PAN document is required." });
     }
 
-    if (!incomeCertificateDocument || incomeCertificateDocument.documentType !== "income_certificate") {
+    if (
+      requiredDocuments.includes("income_certificate") &&
+      (!incomeCertificateDocument || incomeCertificateDocument.documentType !== "income_certificate")
+    ) {
       return res.status(400).json({ message: "A valid uploaded income certificate is required." });
     }
 
-    const resolvedAadhaarNumber = aadhaarNumber || extractAadhaarNumber(aadhaarDocument.ocrText);
-
-    if (!resolvedAadhaarNumber) {
-      return res.status(400).json({ message: "Aadhaar number could not be read from the uploaded Aadhaar document." });
+    if (
+      requiredDocuments.includes("birth_certificate") &&
+      (!birthCertificateDocument || birthCertificateDocument.documentType !== "birth_certificate")
+    ) {
+      return res.status(400).json({ message: "A valid uploaded birth certificate is required." });
     }
 
-    const extractedIncome = incomeCertificateDocument.extractedIncome;
+    const extractedIncome = incomeCertificateDocument?.extractedIncome ?? null;
 
-    if (extractedIncome === null) {
+    if (requiredDocuments.includes("income_certificate") && extractedIncome === null) {
       await logEvent({
         action: "ocr_verification_failed",
         user: req.user.email,
@@ -111,18 +120,29 @@ const createApplication = async (req, res, next) => {
       });
     }
 
-    const officialIncomeRecord = await GovernmentIncomeRecord.findOne({ aadhaar: resolvedAadhaarNumber });
+    const identityCheck = verifyUploadedDocumentIdentity({
+      applicantName: name,
+      aadhaarText: aadhaarDocument.ocrText,
+      panText: panDocument?.ocrText,
+      incomeCertificateText: incomeCertificateDocument?.ocrText,
+      birthCertificateText: birthCertificateDocument?.ocrText,
+      requiredDocuments,
+    });
+
+    const resolvedAadhaarNumber = aadhaarNumber || identityCheck.aadhaarNumber;
+    const resolvedPanNumber = identityCheck.panNumber;
+    const verifiedDateOfBirth = identityCheck.verifiedDateOfBirth || identityCheck.aadhaarDob || "";
 
     const createdAt = new Date();
     const hashVersion = 3;
     const hash = generateApplicationHash(
       {
         name,
-        income: extractedIncome,
+        income: extractedIncome || 0,
         address,
         schemeType,
         aadhaarNumber: resolvedAadhaarNumber,
-        incomeCertificateHash: incomeCertificateDocument.documentHash,
+        incomeCertificateHash: incomeCertificateDocument?.documentHash || birthCertificateDocument?.documentHash || "",
         createdAt,
       },
       hashVersion
@@ -130,40 +150,43 @@ const createApplication = async (req, res, next) => {
     const evaluation = evaluateEligibility({
       schemeType,
       declaredIncome: extractedIncome,
-      verifiedIncome: officialIncomeRecord?.annualIncome ?? null,
-      officialRecordFound: Boolean(officialIncomeRecord),
+      verifiedIncome: extractedIncome,
       aadhaarNumber: resolvedAadhaarNumber,
-      panNumber: "OCR-VERIFIED",
-      incomeCertificateNumber: incomeCertificateDocument.originalFileName,
+      panNumber: resolvedPanNumber,
+      incomeCertificateNumber: incomeCertificateDocument?.originalFileName || birthCertificateDocument?.originalFileName || "",
+      identityVerified: identityCheck.verified,
+      identityReason: identityCheck.reason,
+      dateOfBirth: verifiedDateOfBirth,
     });
 
     const record = await ApplicationRecord.create({
       name,
-      income: extractedIncome,
+      income: extractedIncome || 0,
       extractedIncome,
       address,
       schemeType,
       aadhaar: resolvedAadhaarNumber,
       aadhaarNumber: resolvedAadhaarNumber,
       aadhaarDocumentId: aadhaarDocument._id,
-      panDocumentId: panDocument._id,
-      incomeCertificateDocumentId: incomeCertificateDocument._id,
-      panNumber: "",
-      incomeCertificateNumber: incomeCertificateDocument.originalFileName,
-      ocrText: incomeCertificateDocument.ocrText,
-      ocrEngine: incomeCertificateDocument.ocrEngine,
-      incomeCertificateFileName: incomeCertificateDocument.originalFileName,
-      incomeCertificateMimeType: incomeCertificateDocument.mimeType,
-      incomeCertificatePath: incomeCertificateDocument.filePath,
-      incomeCertificateSize: incomeCertificateDocument.fileSize,
-      incomeCertificateHash: incomeCertificateDocument.documentHash,
+      panDocumentId: panDocument?._id || null,
+      birthCertificateDocumentId: birthCertificateDocument?._id || null,
+      incomeCertificateDocumentId: incomeCertificateDocument?._id || null,
+      panNumber: resolvedPanNumber,
+      incomeCertificateNumber: incomeCertificateDocument?.originalFileName || "",
+      ocrText: incomeCertificateDocument?.ocrText || birthCertificateDocument?.ocrText || "",
+      ocrEngine: incomeCertificateDocument?.ocrEngine || birthCertificateDocument?.ocrEngine || "",
+      incomeCertificateFileName: incomeCertificateDocument?.originalFileName || "",
+      incomeCertificateMimeType: incomeCertificateDocument?.mimeType || "",
+      incomeCertificatePath: incomeCertificateDocument?.filePath || "",
+      incomeCertificateSize: incomeCertificateDocument?.fileSize || 0,
+      incomeCertificateHash: incomeCertificateDocument?.documentHash || "",
       hash,
       hashVersion,
-      verifiedIncome: officialIncomeRecord?.annualIncome ?? null,
+      verifiedIncome: extractedIncome,
       mismatchDetected: evaluation.mismatchDetected,
       suspicious: evaluation.suspicious,
       createdBy: req.user.id,
-      requiredDocumentIds: [aadhaarDocument._id, panDocument._id, incomeCertificateDocument._id],
+      requiredDocumentIds: requestedDocumentIds,
       verificationResult: {
         eligible: evaluation.eligible,
         reason: evaluation.reason,
@@ -181,6 +204,25 @@ const createApplication = async (req, res, next) => {
       updatedAt: createdAt,
     });
 
+    await appendLedgerEntry({
+      entityType: "application_record",
+      entityId: record._id,
+      action: "application_created",
+      actorEmail: req.user.email,
+      actorId: req.user.id,
+      payload: {
+        schemeType,
+        applicationHash: hash,
+        extractedIncome,
+        verifiedIncome: extractedIncome,
+        decisionStatus: evaluation.decisionStatus,
+        suspicious: evaluation.suspicious,
+      },
+      metadata: {
+        requiredDocumentCount: requestedDocumentIds.length,
+      },
+    });
+
     await logEvent({
       action: "record_created",
       user: req.user.email,
@@ -195,25 +237,27 @@ const createApplication = async (req, res, next) => {
       user: req.user.email,
       userId: req.user.id,
       status: "success",
-      details: `Verified uploaded Aadhaar, PAN, and income certificate documents for ${schemeType}`,
+      details: `Verified uploaded scheme documents for ${schemeType}`,
       ipAddress: req.ip || "unknown",
     });
 
-    await logEvent({
-      action: "ocr_verification_result",
-      user: req.user.email,
-      userId: req.user.id,
-      status: evaluation.eligible ? "success" : "warning",
-      details: `OCR extracted income ${extractedIncome} from stored income certificate for ${schemeType}`,
-      ipAddress: req.ip || "unknown",
-    });
+    if (requiredDocuments.includes("income_certificate")) {
+      await logEvent({
+        action: "ocr_verification_result",
+        user: req.user.email,
+        userId: req.user.id,
+        status: evaluation.eligible ? "success" : "warning",
+        details: `OCR extracted income ${extractedIncome} from stored income certificate for ${schemeType}`,
+        ipAddress: req.ip || "unknown",
+      });
+    }
 
     if (evaluation.suspicious || evaluation.mismatchDetected) {
       await notifyUser({
         userId: req.user.id,
         userEmail: req.user.email,
         type: "income_mismatch_detected",
-        title: "Suspicious Income Verification Result",
+        title: "Document Verification Issue",
         message: evaluation.reason,
         severity: "alert",
         relatedRecordId: record._id,
@@ -272,6 +316,22 @@ const getApplicationById = async (req, res, next) => {
           : "Your application data failed integrity verification. Please review this record immediately.",
         severity: "alert",
         relatedRecordId: record._id,
+      });
+
+      await appendLedgerEntry({
+        entityType: "application_record",
+        entityId: record._id,
+        action: "tampering_detected",
+        actorEmail: req.user.email,
+        actorId: req.user.id,
+        payload: {
+          storedHash: record.hash,
+          currentHash: integrity.currentHash,
+          documentTampered: integrity.documentTampered,
+        },
+        metadata: {
+          integrityStatus: integrity.integrityStatus,
+        },
       });
 
       return res.status(200).json({
@@ -334,6 +394,20 @@ const simulateTamper = async (req, res, next) => {
 
     record.address = `${record.address} (tampered)`;
     await record.save();
+
+    await appendLedgerEntry({
+      entityType: "application_record",
+      entityId: record._id,
+      action: "tamper_simulated",
+      actorEmail: req.user.email,
+      actorId: req.user.id,
+      payload: {
+        applicationHash: record.hash,
+      },
+      metadata: {
+        changedField: "address",
+      },
+    });
 
     await logEvent({
       action: "record_modified",

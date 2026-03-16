@@ -10,6 +10,7 @@ const emptyForm = {
   aadhaarDocumentId: "",
   panDocumentId: "",
   incomeCertificateDocumentId: "",
+  birthCertificateDocumentId: "",
 };
 
 const toFormState = (initialValues) => ({
@@ -20,7 +21,27 @@ const toFormState = (initialValues) => ({
   aadhaarDocumentId: initialValues?.aadhaarDocumentId ?? "",
   panDocumentId: initialValues?.panDocumentId ?? "",
   incomeCertificateDocumentId: initialValues?.incomeCertificateDocumentId ?? "",
+  birthCertificateDocumentId: initialValues?.birthCertificateDocumentId ?? "",
 });
+
+const documentFieldMap = {
+  aadhaar: {
+    field: "aadhaarDocumentId",
+    placeholder: "Select Aadhaar",
+  },
+  pan: {
+    field: "panDocumentId",
+    placeholder: "Select PAN",
+  },
+  income_certificate: {
+    field: "incomeCertificateDocumentId",
+    placeholder: "Select Income Certificate",
+  },
+  birth_certificate: {
+    field: "birthCertificateDocumentId",
+    placeholder: "Select Birth Certificate",
+  },
+};
 
 const extractAadhaarNumber = (text) => {
   const normalized = String(text ?? "").replace(/\D/g, "");
@@ -69,6 +90,7 @@ function RecordForm({
   const missingRequiredDocuments = selectedScheme.requiredDocuments.filter(
     (type) => !(documentsByType[type] || []).length
   );
+  const requiredDocumentTypes = selectedScheme.requiredDocuments.filter((type) => documentFieldMap[type]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -86,9 +108,12 @@ function RecordForm({
 
   return (
     <section className="page-section">
-      <div className="mb-5 flex items-center justify-between gap-4">
-        <div className="text-xl font-bold text-slate-900">{title}</div>
-        <div className="text-sm text-slate-500">{form.schemeType}</div>
+      <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="section-title">Application Form</div>
+          <div className="mt-2 text-xl font-bold text-slate-900">{title}</div>
+        </div>
+        <div className="rounded-2xl bg-blue-50 px-4 py-2 text-sm font-semibold text-[#1E3A8A]">{form.schemeType}</div>
       </div>
 
       {missingRequiredDocuments.length ? (
@@ -108,6 +133,12 @@ function RecordForm({
               </Link>
             ))}
           </div>
+        </div>
+      ) : null}
+
+      {!missingRequiredDocuments.length ? (
+        <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-800">
+          Required documents are available. You can submit this application now.
         </div>
       ) : null}
 
@@ -147,52 +178,29 @@ function RecordForm({
           required
         />
         <input type="hidden" name="aadhaarNumber" value={form.aadhaarNumber || ""} readOnly />
-        <div className="grid gap-4 md:grid-cols-3">
-          <select
-            className="field-input"
-            name="aadhaarDocumentId"
-            value={form.aadhaarDocumentId}
-            onChange={handleChange}
-            disabled={disabled}
-            required
-          >
-            <option value="">Select Aadhaar</option>
-            {(documentsByType.aadhaar || []).map((document) => (
-              <option key={document._id} value={document._id}>
-                {document.originalFileName}
-              </option>
-            ))}
-          </select>
-          <select
-            className="field-input"
-            name="panDocumentId"
-            value={form.panDocumentId}
-            onChange={handleChange}
-            disabled={disabled}
-            required
-          >
-            <option value="">Select PAN</option>
-            {(documentsByType.pan || []).map((document) => (
-              <option key={document._id} value={document._id}>
-                {document.originalFileName}
-              </option>
-            ))}
-          </select>
-          <select
-            className="field-input"
-            name="incomeCertificateDocumentId"
-            value={form.incomeCertificateDocumentId}
-            onChange={handleChange}
-            disabled={disabled}
-            required
-          >
-            <option value="">Select Income Certificate</option>
-            {(documentsByType.income_certificate || []).map((document) => (
-              <option key={document._id} value={document._id}>
-                {document.originalFileName}
-              </option>
-            ))}
-          </select>
+        <div className={`grid gap-4 ${requiredDocumentTypes.length > 2 ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
+          {requiredDocumentTypes.map((type) => {
+            const config = documentFieldMap[type];
+
+            return (
+              <select
+                key={type}
+                className="field-input"
+                name={config.field}
+                value={form[config.field]}
+                onChange={handleChange}
+                disabled={disabled}
+                required
+              >
+                <option value="">{config.placeholder}</option>
+                {(documentsByType[type] || []).map((document) => (
+                  <option key={document._id} value={document._id}>
+                    {document.originalFileName}
+                  </option>
+                ))}
+              </select>
+            );
+          })}
         </div>
         <button className="primary-button" type="submit" disabled={disabled || missingRequiredDocuments.length > 0}>
           {submitLabel}

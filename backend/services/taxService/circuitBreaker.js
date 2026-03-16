@@ -1,6 +1,6 @@
 const WINDOW_MS = 20 * 1000;
 const OPEN_MS = 30 * 1000;
-const MAX_REQUESTS = 5;
+const MAX_REQUESTS = 4;
 
 const state = {
   openUntil: 0,

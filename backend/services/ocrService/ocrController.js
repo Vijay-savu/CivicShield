@@ -17,7 +17,10 @@ const scanDocumentText = async (file) => {
     }
   }
 
-  const result = await Tesseract.recognize(file.path, "eng");
+  const result = await Tesseract.recognize(file.path, "eng", {
+    tessedit_pageseg_mode: Tesseract.PSM.AUTO,
+    preserve_interword_spaces: "1",
+  });
 
   return {
     text: result.data?.text?.trim() || "",

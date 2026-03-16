@@ -5,6 +5,7 @@ import IntegrityBadge from "../components/IntegrityBadge";
 import TamperAlert from "../components/TamperAlert";
 import { getRecordById } from "../services/recordService";
 import { checkEligibility } from "../services/verificationService";
+import { getRecordLedger } from "../services/ledgerService";
 
 const maskValue = (value, visibleDigits = 4) => {
   const normalized = String(value ?? "");
@@ -25,6 +26,7 @@ function RecordViewerPage() {
   const [record, setRecord] = useState(null);
   const [integrityStatus, setIntegrityStatus] = useState("VERIFIED");
   const [loading, setLoading] = useState(true);
+  const [ledger, setLedger] = useState(null);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
 
@@ -36,6 +38,8 @@ function RecordViewerPage() {
       const data = await getRecordById(id);
       setRecord(data.record);
       setIntegrityStatus(data.integrityStatus);
+      const ledgerData = await getRecordLedger(id);
+      setLedger(ledgerData);
     } catch (requestError) {
       setError(requestError.response?.data?.message || "Failed to load application.");
     } finally {
@@ -163,13 +167,13 @@ function RecordViewerPage() {
 
             {record.suspicious ? (
               <div className="status-danger mt-4 px-4 py-3 text-sm">
-                Income verification failed against the trusted government record.
+                Uploaded documents could not be verified as belonging to the same citizen.
               </div>
             ) : null}
 
             {record.mismatchDetected ? (
               <div className="status-danger mt-4 px-4 py-3 text-sm">
-                OCR income does not match the trusted government record.
+                Uploaded document data could not be matched during eligibility verification.
               </div>
             ) : null}
 
@@ -183,6 +187,27 @@ function RecordViewerPage() {
               <button className="primary-button" type="button" onClick={handleVerify}>
                 Refresh Verification
               </button>
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-700">Tamper-Evident Ledger</p>
+                  <p className="mt-2 text-sm text-slate-600">
+                    {ledger?.chainValid ? "Ledger chain verified." : "Ledger chain mismatch detected."}
+                  </p>
+                </div>
+                <IntegrityBadge status={ledger?.chainValid ? "VERIFIED" : "TAMPERING DETECTED"} />
+              </div>
+              <div className="mt-4 space-y-3">
+                {(ledger?.entries || []).slice(-4).reverse().map((entry) => (
+                  <div key={entry.id} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                    <p className="text-sm font-semibold text-slate-900">{entry.action.replace(/_/g, " ")}</p>
+                    <p className="mt-1 text-xs text-slate-500">{new Date(entry.createdAt).toLocaleString()}</p>
+                    <p className="mt-2 text-xs break-all text-slate-600">Hash: {entry.ledgerHash}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </section>
         </div>

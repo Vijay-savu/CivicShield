@@ -104,6 +104,11 @@ const applicationRecordSchema = new mongoose.Schema(
       ref: "DocumentRecord",
       default: null,
     },
+    birthCertificateDocumentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "DocumentRecord",
+      default: null,
+    },
     incomeCertificateNumber: {
       type: String,
       required: false,

@@ -7,6 +7,7 @@ const { extractIncomeFromText } = require("../../utils/extractIncome");
 const { logEvent } = require("../../utils/logEvent");
 const { notifyUser } = require("../../utils/notifyUser");
 const { validateDocumentContent } = require("../../utils/validateDocumentContent");
+const { appendLedgerEntry } = require("../../utils/tamperLedger");
 
 const documentLabels = {
   aadhaar: "Aadhaar Card",
@@ -124,6 +125,23 @@ const uploadDocument = async (req, res, next) => {
       extractedIncome,
     });
 
+    await appendLedgerEntry({
+      entityType: "document_record",
+      entityId: document._id,
+      action: existingDocuments.length ? "document_replaced" : "document_uploaded",
+      actorEmail: req.user.email,
+      actorId: req.user.id,
+      payload: {
+        documentType,
+        documentHash,
+        ocrEngine,
+        extractedIncome,
+      },
+      metadata: {
+        originalFileName: file.originalname,
+      },
+    });
+
     await logEvent({
       action: "document_uploaded",
       user: req.user.email,
@@ -197,6 +215,21 @@ const getDocumentById = async (req, res, next) => {
         severity: "alert",
         relatedRecordId: document._id,
       });
+
+      await appendLedgerEntry({
+        entityType: "document_record",
+        entityId: document._id,
+        action: "tampering_detected",
+        actorEmail: req.user.email,
+        actorId: req.user.id,
+        payload: {
+          storedHash: document.documentHash,
+          currentHash: integrity.currentHash,
+        },
+        metadata: {
+          integrityStatus: integrity.integrityStatus,
+        },
+      });
     }
 
     return res.status(200).json({
@@ -216,6 +249,22 @@ const deleteDocument = async (req, res, next) => {
     }
 
     await cleanupUploadedFile(document.filePath);
+
+    await appendLedgerEntry({
+      entityType: "document_record",
+      entityId: document._id,
+      action: "document_deleted",
+      actorEmail: req.user.email,
+      actorId: req.user.id,
+      payload: {
+        documentType: document.documentType,
+        documentHash: document.documentHash,
+      },
+      metadata: {
+        originalFileName: document.originalFileName,
+      },
+    });
+
     await document.deleteOne();
 
     await logEvent({

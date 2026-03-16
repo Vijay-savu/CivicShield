@@ -85,9 +85,23 @@ const matchesIncomeCertificate = (text, extractedIncome) => {
     /\bincome\b/i,
     /revenue department/i,
     /issued by/i,
+    /government of andhra pradesh/i,
+    /annual income from all sources/i,
+    /tahsildar/i,
+    /digitally signed/i,
+    /apgsws/i,
   ]);
 
-  return hasKeyword && Number(extractedIncome) > 0;
+  const hasGovernmentContext = hasAny(source, [
+    /government of .*pradesh/i,
+    /revenue department/i,
+    /application no/i,
+    /digitally signed/i,
+    /deputy tahsildar/i,
+    /mandal/i,
+  ]);
+
+  return Number(extractedIncome) > 0 && (hasKeyword || hasGovernmentContext);
 };
 
 const validators = {

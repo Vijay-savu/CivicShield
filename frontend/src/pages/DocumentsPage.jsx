@@ -87,32 +87,46 @@ function DocumentsPage() {
   return (
     <AppShell
       title="My Documents"
-      subtitle="Upload and manage government documents."
+      subtitle="Securely maintain verified government documents for service use."
     >
       <div className="grid gap-6">
         {feedback ? <div className="status-success px-5 py-4 text-sm">{feedback}</div> : null}
         {error ? <div className="status-danger px-5 py-4 text-sm">{error}</div> : null}
 
-        <section className="grid gap-4 md:grid-cols-2">
-          <div className="dashboard-card">
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Uploaded</div>
-            <div className="mt-3 text-3xl font-bold text-slate-900">{visibleDocuments.length}</div>
-          </div>
-          <div className="dashboard-card">
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Missing</div>
-            <div className="mt-3 text-3xl font-bold text-amber-600">{missingDocuments.length}</div>
+        <section className="overflow-hidden rounded-[30px] border border-blue-100 bg-white shadow-[0_18px_42px_rgba(15,23,42,0.08)]">
+          <div className="grid gap-6 bg-[linear-gradient(135deg,rgba(30,58,138,0.06),rgba(59,130,246,0.03))] px-6 py-7 lg:grid-cols-[1.3fr_0.7fr]">
+            <div>
+              <div className="portal-ribbon">Citizen Document Vault</div>
+              <h2 className="mt-4 text-3xl font-bold tracking-tight text-slate-900">Verified Documents</h2>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+                Upload one trusted copy of each document type. New uploads replace the previous version automatically.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-3xl border border-slate-200 bg-white p-5">
+                <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Uploaded</div>
+                <div className="mt-3 text-4xl font-bold text-[#1E3A8A]">{visibleDocuments.length}</div>
+              </div>
+              <div className="rounded-3xl border border-slate-200 bg-white p-5">
+                <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Missing</div>
+                <div className="mt-3 text-4xl font-bold text-amber-600">{missingDocuments.length}</div>
+              </div>
+            </div>
           </div>
         </section>
 
         <section className="page-section">
-          <div className="mb-4 text-xs font-semibold uppercase tracking-[0.24em] text-blue-700">Document Status</div>
+          <div className="mb-4">
+            <div className="section-title">Document Status</div>
+            <h3 className="mt-2 text-xl font-bold text-slate-900">Required Records</h3>
+          </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {requiredCitizenDocuments.map((type) => {
               const document = latestDocumentsByType[type];
               const config = documentTypeConfig[type];
 
               return (
-                <article key={type} className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                <article key={type} className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-slate-900">{config.label}</p>
@@ -145,22 +159,20 @@ function DocumentsPage() {
 
         <section>
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {loading ? (
-            <div className="page-section text-sm text-slate-600">Loading documents...</div>
-          ) : visibleDocuments.length === 0 ? (
-            <div className="page-section text-sm text-slate-600">
-              No documents uploaded yet.
-            </div>
-          ) : (
-            visibleDocuments.map((document) => (
-              <DocumentCard
-                key={document._id}
-                document={document}
-                onDelete={handleDelete}
-                deleting={deletingId === document._id}
-              />
-            ))
-          )}
+            {loading ? (
+              <div className="page-section text-sm text-slate-600">Loading documents...</div>
+            ) : visibleDocuments.length === 0 ? (
+              <div className="page-section text-sm text-slate-600">No documents uploaded yet.</div>
+            ) : (
+              visibleDocuments.map((document) => (
+                <DocumentCard
+                  key={document._id}
+                  document={document}
+                  onDelete={handleDelete}
+                  deleting={deletingId === document._id}
+                />
+              ))
+            )}
           </div>
         </section>
       </div>

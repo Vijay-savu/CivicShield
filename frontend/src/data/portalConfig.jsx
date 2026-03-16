@@ -67,8 +67,8 @@ export const schemeConfig = {
   },
   "Senior Pension": {
     heading: "Senior Pension",
-    description: "Pension support for senior applicants based on age verification.",
-    requiredDocuments: ["aadhaar", "pan", "income_certificate"],
-    eligibilityHint: "Age-based verification using senior citizen records and date-of-birth proof.",
+    description: "Pension support for senior applicants using Aadhaar and birth-certificate age verification.",
+    requiredDocuments: ["aadhaar", "birth_certificate"],
+    eligibilityHint: "Eligible when verified age is 60 years or above.",
   },
 };

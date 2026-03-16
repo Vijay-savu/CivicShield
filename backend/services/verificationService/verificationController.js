@@ -1,9 +1,10 @@
 const ApplicationRecord = require("../../models/ApplicationRecord");
-const GovernmentIncomeRecord = require("../../models/GovernmentIncomeRecord");
+const { DocumentRecord } = require("../../models/DocumentRecord");
 const { getApplicationIntegrity } = require("../../utils/applicationIntegrity");
-const { evaluateEligibility } = require("../../utils/eligibilityEngine");
+const { evaluateEligibility, getRequiredDocumentsForScheme } = require("../../utils/eligibilityEngine");
 const { logEvent } = require("../../utils/logEvent");
 const { notifyUser } = require("../../utils/notifyUser");
+const { verifyUploadedDocumentIdentity } = require("../../utils/documentIdentity");
 const circuitBreaker = require("./circuitBreaker");
 
 const checkEligibility = async (req, res, next) => {
@@ -48,16 +49,43 @@ const checkEligibility = async (req, res, next) => {
       });
     }
 
-    const officialIncomeRecord = await GovernmentIncomeRecord.findOne({ aadhaar: record.aadhaar || record.aadhaarNumber });
+    const requiredDocuments = getRequiredDocumentsForScheme(record.schemeType);
+    const documents = await DocumentRecord.find({
+      _id: {
+        $in: [
+          record.aadhaarDocumentId,
+          record.panDocumentId,
+          record.incomeCertificateDocumentId,
+          record.birthCertificateDocumentId,
+        ].filter(Boolean),
+      },
+      userId: req.user.id,
+    });
+    const documentMap = new Map(documents.map((document) => [document._id.toString(), document]));
+    const aadhaarDocument = documentMap.get(String(record.aadhaarDocumentId || ""));
+    const panDocument = documentMap.get(String(record.panDocumentId || ""));
+    const incomeCertificateDocument = documentMap.get(String(record.incomeCertificateDocumentId || ""));
+    const birthCertificateDocument = documentMap.get(String(record.birthCertificateDocumentId || ""));
+
+    const identityCheck = verifyUploadedDocumentIdentity({
+      applicantName: record.name,
+      aadhaarText: aadhaarDocument?.ocrText,
+      panText: panDocument?.ocrText,
+      incomeCertificateText: incomeCertificateDocument?.ocrText,
+      birthCertificateText: birthCertificateDocument?.ocrText,
+      requiredDocuments,
+    });
 
     const evaluation = evaluateEligibility({
       schemeType: record.schemeType,
-      declaredIncome: record.extractedIncome || record.income,
-      verifiedIncome: officialIncomeRecord?.annualIncome ?? null,
-      officialRecordFound: Boolean(officialIncomeRecord),
-      aadhaarNumber: record.aadhaar || record.aadhaarNumber,
-      panNumber: "OCR-VERIFIED",
+      declaredIncome: record.extractedIncome ?? record.income,
+      verifiedIncome: record.extractedIncome ?? record.income,
+      aadhaarNumber: identityCheck.aadhaarNumber || record.aadhaar || record.aadhaarNumber,
+      panNumber: identityCheck.panNumber || record.panNumber,
       incomeCertificateNumber: record.incomeCertificateFileName || record.incomeCertificateNumber,
+      identityVerified: identityCheck.verified,
+      identityReason: identityCheck.reason,
+      dateOfBirth: identityCheck.verifiedDateOfBirth || identityCheck.aadhaarDob || "",
     });
 
     record.verificationResult = {
@@ -66,7 +94,7 @@ const checkEligibility = async (req, res, next) => {
       checkedAt: new Date(),
       checkedBy: null,
     };
-    record.verifiedIncome = officialIncomeRecord?.annualIncome ?? null;
+    record.verifiedIncome = record.extractedIncome ?? record.income;
     record.mismatchDetected = evaluation.mismatchDetected;
     record.suspicious = evaluation.suspicious;
     record.documentStatus = evaluation.documentStatus;
@@ -92,7 +120,7 @@ const checkEligibility = async (req, res, next) => {
         userId: req.user.id,
         userEmail: req.user.email,
         type: "income_mismatch_detected",
-        title: "Suspicious Income Verification Result",
+        title: "Document Verification Issue",
         message: evaluation.reason,
         severity: "alert",
         relatedRecordId: record._id,

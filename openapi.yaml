@@ -1,0 +1,113 @@
+openapi: 3.0.3
+info:
+  title: CivicShield REST API
+  version: 1.0.0
+  description: REST API for the CivicShield secure government service portal.
+servers:
+  - url: http://localhost:5000/api
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: Backend is healthy
+  /auth/login:
+    post:
+      summary: Citizen login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "200":
+          description: JWT session created
+  /documents:
+    get:
+      summary: List citizen documents
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Documents listed
+  /documents/upload:
+    post:
+      summary: Upload a government document
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [documentType, file]
+              properties:
+                documentType:
+                  type: string
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Document uploaded
+  /records/create:
+    post:
+      summary: Create a scheme application
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Application created
+  /records/{id}:
+    get:
+      summary: Get application by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Application detail
+  /verification/checkEligibility:
+    post:
+      summary: Refresh eligibility
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Eligibility refreshed
+  /gateway/status:
+    get:
+      summary: Gateway and microservice status
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Status snapshot
+  /gateway/security-posture:
+    get:
+      summary: Defense-in-depth security posture
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Security posture snapshot
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

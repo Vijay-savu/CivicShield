@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AppShell from "../components/AppShell";
 import { getNotifications, markNotificationRead } from "../services/notificationService";
+import { getSecurityPosture } from "../services/gatewayService";
 
 const severityStyles = {
   info: "border-sky-100 bg-sky-50 text-sky-900",
@@ -10,6 +11,7 @@ const severityStyles = {
 
 function SecurityAlertsPage() {
   const [notifications, setNotifications] = useState([]);
+  const [securityLayers, setSecurityLayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -18,8 +20,9 @@ function SecurityAlertsPage() {
     setError("");
 
     try {
-      const data = await getNotifications();
-      setNotifications(data);
+      const [notificationData, posture] = await Promise.all([getNotifications(), getSecurityPosture()]);
+      setNotifications(notificationData);
+      setSecurityLayers(posture.layers || []);
     } catch (requestError) {
       setError(requestError.response?.data?.message || "Failed to load security alerts.");
     } finally {
@@ -48,6 +51,22 @@ function SecurityAlertsPage() {
     <AppShell title="Security Alerts" subtitle="Citizen alerts only.">
       {error ? <div className="status-danger mb-6 px-5 py-4 text-sm">{error}</div> : null}
       <section className="page-section">
+        <div className="mb-6">
+          <h2 className="text-lg font-bold text-slate-900">Active Security Layers</h2>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {securityLayers.map((layer) => (
+              <div key={layer.name} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-slate-900">{layer.name}</p>
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
+                    {layer.status}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-slate-600">{layer.evidence}</p>
+              </div>
+            ))}
+          </div>
+        </div>
         <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-800">
           If you did not initiate the activity shown here, contact the cybercrime helpdesk immediately and do not upload new documents until the issue is reviewed.
         </div>

@@ -2,10 +2,12 @@ import IntegrityBadge from "./IntegrityBadge";
 
 function DocumentCard({ document, onDelete, deleting = false }) {
   return (
-    <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_14px_30px_rgba(15,23,42,0.08)]">
+    <article className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_14px_30px_rgba(15,23,42,0.08)]">
+      <div className="h-1 bg-gradient-to-r from-[#1E3A8A] via-[#3B82F6] to-[#93C5FD]" />
+      <div className="p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-700">{document.documentLabel}</p>
+          <p className="section-title">{document.documentLabel}</p>
           <h3 className="mt-3 text-lg font-semibold text-slate-900">{document.documentLabel}</h3>
           <p className="mt-1 text-sm text-slate-500">{document.originalFileName}</p>
         </div>
@@ -38,6 +40,7 @@ function DocumentCard({ document, onDelete, deleting = false }) {
           </div>
         ) : null}
       </dl>
+      </div>
     </article>
   );
 }
