@@ -1,5 +1,6 @@
 const ApplicationRecord = require("../../models/ApplicationRecord");
 const { DocumentRecord } = require("../../models/DocumentRecord");
+const Scheme = require("../../models/Scheme");
 const User = require("../../models/User");
 const { generateApplicationHash } = require("../../utils/hash");
 const { getApplicationIntegrity } = require("../../utils/applicationIntegrity");
@@ -63,7 +64,13 @@ const createApplication = async (req, res, next) => {
       return res.status(404).json({ message: "Citizen profile not found." });
     }
 
-    const requiredDocuments = getRequiredDocumentsForScheme(schemeType);
+    const scheme = await Scheme.findOne({ name: schemeType, active: true });
+
+    if (!scheme) {
+      return res.status(400).json({ message: "Selected scheme is not available." });
+    }
+
+    const requiredDocuments = getRequiredDocumentsForScheme(schemeType, scheme);
     const requestedDocumentIds = [
       aadhaarDocumentId,
       panDocumentId,
@@ -157,6 +164,7 @@ const createApplication = async (req, res, next) => {
       identityVerified: identityCheck.verified,
       identityReason: identityCheck.reason,
       dateOfBirth: verifiedDateOfBirth,
+      schemeRule: scheme,
     });
 
     const record = await ApplicationRecord.create({

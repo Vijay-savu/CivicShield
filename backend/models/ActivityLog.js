@@ -35,6 +35,19 @@ const activityLogSchema = new mongoose.Schema({
     type: String,
     default: "unknown",
   },
+  threatLevel: {
+    type: String,
+    enum: ["LOW", "MEDIUM", "HIGH"],
+    default: "LOW",
+  },
+  threatScore: {
+    type: Number,
+    default: 0,
+  },
+  anomalyType: {
+    type: String,
+    default: "normal",
+  },
 });
 
 module.exports = mongoose.model("ActivityLog", activityLogSchema);

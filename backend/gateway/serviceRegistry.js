@@ -1,6 +1,7 @@
 const authRoutes = require("../services/authService/routes");
 const documentRoutes = require("../services/documentService/routes");
 const recordRoutes = require("../services/recordService/routes");
+const schemeRoutes = require("../services/schemeService/routes");
 const verificationRoutes = require("../services/verificationService/routes");
 const monitoringRoutes = require("../services/monitoringService/routes");
 const notificationRoutes = require("../services/notificationService/routes");
@@ -76,6 +77,22 @@ const serviceRegistry = [
     },
   },
   {
+    id: "scheme-service",
+    name: "Scheme Service",
+    type: "scheme",
+    basePath: "/schemes",
+    description: "Provides dynamic scheme configuration and rule management for government programs.",
+    dependencies: ["MongoDB", "Scheme Store"],
+    routes: schemeRoutes,
+    public: false,
+    status: "active",
+    protection: {
+      rateLimit: { windowMs: 60 * 1000, maxRequests: 20 },
+      maxConsecutiveErrors: 4,
+      cooldownMs: 20 * 1000,
+    },
+  },
+  {
     id: "verification-service",
     name: "Verification Service",
     type: "verification",
@@ -125,10 +142,10 @@ const serviceRegistry = [
   },
   {
     id: "monitoring-service",
-    name: "Monitoring Service",
-    type: "monitoring",
+    name: "Security Service",
+    type: "security-monitoring",
     basePath: "/logs",
-    description: "Tracks monitoring logs, alerts, and operational events.",
+    description: "Tracks monitoring logs, threat scores, alerts, and operational security events.",
     dependencies: ["Activity Logs", "MongoDB"],
     routes: monitoringRoutes,
     public: false,

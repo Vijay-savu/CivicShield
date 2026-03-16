@@ -1,5 +1,6 @@
 const ApplicationRecord = require("../../models/ApplicationRecord");
 const { DocumentRecord } = require("../../models/DocumentRecord");
+const Scheme = require("../../models/Scheme");
 const { getApplicationIntegrity } = require("../../utils/applicationIntegrity");
 const { evaluateEligibility, getRequiredDocumentsForScheme } = require("../../utils/eligibilityEngine");
 const { logEvent } = require("../../utils/logEvent");
@@ -49,7 +50,8 @@ const checkEligibility = async (req, res, next) => {
       });
     }
 
-    const requiredDocuments = getRequiredDocumentsForScheme(record.schemeType);
+    const scheme = await Scheme.findOne({ name: record.schemeType, active: true });
+    const requiredDocuments = getRequiredDocumentsForScheme(record.schemeType, scheme);
     const documents = await DocumentRecord.find({
       _id: {
         $in: [
@@ -86,6 +88,7 @@ const checkEligibility = async (req, res, next) => {
       identityVerified: identityCheck.verified,
       identityReason: identityCheck.reason,
       dateOfBirth: identityCheck.verifiedDateOfBirth || identityCheck.aadhaarDob || "",
+      schemeRule: scheme,
     });
 
     record.verificationResult = {

@@ -12,16 +12,7 @@ import {
 } from "../services/gatewayService";
 import { getNotifications } from "../services/notificationService";
 import { getRecords } from "../services/recordService";
-
-const featuredServices = Object.entries(schemeConfig).map(([schemeName, config], index) => ({
-  title: schemeName,
-  description: config.description,
-  to: `/apply?scheme=${encodeURIComponent(schemeName)}`,
-  tag: "Service",
-  statLabel: "Eligibility",
-  statValue: config.eligibilityHint,
-  number: String(index + 1).padStart(2, "0"),
-}));
+import { getSchemes } from "../services/schemeService";
 
 const documentItems = [
   { title: "Aadhaar", to: "/documents?type=aadhaar" },
@@ -69,11 +60,22 @@ function DashboardPage() {
     securityLayers: [],
     blueprint: fallbackBlueprint,
   });
+  const [featuredServices, setFeaturedServices] = useState(
+    Object.entries(schemeConfig).map(([schemeName, config], index) => ({
+      title: schemeName,
+      description: config.description,
+      to: `/apply?scheme=${encodeURIComponent(schemeName)}`,
+      tag: "Service",
+      statLabel: "Eligibility",
+      statValue: config.eligibilityHint,
+      number: String(index + 1).padStart(2, "0"),
+    }))
+  );
 
   useEffect(() => {
     const loadDashboard = async () => {
       try {
-        const [records, notifications, documents, gatewayStatus, availabilityData, securityPosture, blueprint] =
+        const [records, notifications, documents, gatewayStatus, availabilityData, securityPosture, blueprint, schemes] =
           await Promise.all([
             getRecords(),
             getNotifications(),
@@ -82,6 +84,7 @@ function DashboardPage() {
             getGatewayAvailability(),
             getSecurityPosture(),
             getGatewayBlueprint(),
+            getSchemes(),
           ]);
 
         setStats({
@@ -96,6 +99,19 @@ function DashboardPage() {
           securityLayers: securityPosture?.layers || [],
           blueprint: blueprint?.flow?.length ? blueprint.flow : fallbackBlueprint,
         });
+        setFeaturedServices(
+          (schemes.length ? schemes : Object.entries(schemeConfig).map(([name, config]) => ({ name, ...config }))).map(
+            (item, index) => ({
+              title: item.name || item.title,
+              description: item.description,
+              to: `/apply?scheme=${encodeURIComponent(item.name || item.title)}`,
+              tag: "Service",
+              statLabel: "Eligibility",
+              statValue: item.eligibilityHint,
+              number: String(index + 1).padStart(2, "0"),
+            })
+          )
+        );
       } catch (error) {
         setStats({ documents: 0, alerts: 0, applications: 0 });
         setPlatform({
@@ -104,6 +120,17 @@ function DashboardPage() {
           securityLayers: [],
           blueprint: fallbackBlueprint,
         });
+        setFeaturedServices(
+          Object.entries(schemeConfig).map(([schemeName, config], index) => ({
+            title: schemeName,
+            description: config.description,
+            to: `/apply?scheme=${encodeURIComponent(schemeName)}`,
+            tag: "Service",
+            statLabel: "Eligibility",
+            statValue: config.eligibilityHint,
+            number: String(index + 1).padStart(2, "0"),
+          }))
+        );
       }
     };
 

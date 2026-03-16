@@ -1,6 +1,6 @@
 const normalizeText = (value) => String(value ?? "").trim();
 const { DOCUMENT_TYPES } = require("../models/DocumentRecord");
-const { SUPPORTED_SCHEMES, getRequiredDocumentsForScheme } = require("../utils/eligibilityEngine");
+const { getRequiredDocumentsForScheme } = require("../utils/eligibilityEngine");
 
 const validateLogin = (req, res, next) => {
   const email = normalizeText(req.body.email).toLowerCase();
@@ -46,10 +46,6 @@ const validateApplicationCreate = (req, res, next) => {
     return res.status(400).json({
       message: "name, address, and schemeType are required.",
     });
-  }
-
-  if (!SUPPORTED_SCHEMES.includes(schemeType)) {
-    return res.status(400).json({ message: "Selected scheme is not supported." });
   }
 
   const requiredDocuments = getRequiredDocumentsForScheme(schemeType);

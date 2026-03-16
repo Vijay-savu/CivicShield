@@ -60,7 +60,8 @@ const schemeRules = {
   },
 };
 
-const getRequiredDocumentsForScheme = (schemeType) => schemeRules[schemeType]?.requiredDocuments || [];
+const getRequiredDocumentsForScheme = (schemeType, schemeRule = null) =>
+  schemeRule?.requiredDocuments || schemeRules[schemeType]?.requiredDocuments || [];
 
 const calculateAgeFromDob = (dateOfBirth) => {
   if (!dateOfBirth) {
@@ -161,6 +162,7 @@ const evaluateEligibility = ({
   identityVerified = true,
   identityReason = "",
   dateOfBirth = "",
+  schemeRule = null,
 }) => {
   const documentStatus = validateDocuments({
     schemeType,
@@ -193,7 +195,7 @@ const evaluateEligibility = ({
     };
   }
 
-  const rule = schemeRules[schemeType];
+  const rule = schemeRule || schemeRules[schemeType];
 
   if (!rule) {
     return {

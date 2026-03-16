@@ -6,9 +6,9 @@ const router = express.Router();
 
 router.get("/health", (req, res) => {
   res.status(200).json({
-    service: "Monitoring Service",
+    service: "Security Service",
     status: "active",
-    capability: "security logs, alerts, and operational visibility",
+    capability: "security logs, threat scoring, alerts, and operational visibility",
   });
 });
 

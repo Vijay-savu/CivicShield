@@ -5,16 +5,29 @@ import RecordForm from "../components/RecordForm";
 import { schemeConfig } from "../data/portalConfig";
 import { getDocuments } from "../services/documentService";
 import { createRecord } from "../services/recordService";
+import { getSchemes } from "../services/schemeService";
+
+const toSchemeMap = (schemes = []) =>
+  schemes.reduce((accumulator, scheme) => {
+    accumulator[scheme.name] = {
+      heading: scheme.name,
+      description: scheme.description,
+      requiredDocuments: scheme.requiredDocuments || [],
+      eligibilityHint: scheme.eligibilityHint,
+    };
+    return accumulator;
+  }, {});
 
 function ApplySubsidyPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [documents, setDocuments] = useState([]);
+  const [schemes, setSchemes] = useState(schemeConfig);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
   const requestedScheme = searchParams.get("scheme");
-  const defaultScheme = requestedScheme && schemeConfig[requestedScheme] ? requestedScheme : "Subsidy Support";
+  const defaultScheme = requestedScheme && schemes[requestedScheme] ? requestedScheme : Object.keys(schemes)[0] || "Subsidy Support";
   const [selectedScheme, setSelectedScheme] = useState(defaultScheme);
   const initialFormValues = useMemo(() => ({ schemeType: selectedScheme }), [selectedScheme]);
 
@@ -23,16 +36,18 @@ function ApplySubsidyPage() {
   }, [defaultScheme]);
 
   useEffect(() => {
-    const loadDocuments = async () => {
+    const loadData = async () => {
       try {
-        const response = await getDocuments();
-        setDocuments(response);
+        const [documentResponse, schemeResponse] = await Promise.all([getDocuments(), getSchemes()]);
+        setDocuments(documentResponse);
+        setSchemes(Object.keys(toSchemeMap(schemeResponse)).length ? toSchemeMap(schemeResponse) : schemeConfig);
       } catch (requestError) {
         setDocuments([]);
+        setSchemes(schemeConfig);
       }
     };
 
-    loadDocuments();
+    loadData();
   }, []);
 
   const handleCreate = async (formData) => {
@@ -72,13 +87,13 @@ function ApplySubsidyPage() {
             <div className="rounded-3xl border border-blue-100 bg-white p-5">
               <div className="text-xs uppercase tracking-[0.22em] text-slate-500">Selected Service</div>
               <div className="mt-3 text-2xl font-bold text-[#1E3A8A]">{selectedScheme}</div>
-              <p className="mt-2 text-sm text-slate-600">{schemeConfig[selectedScheme]?.eligibilityHint}</p>
+              <p className="mt-2 text-sm text-slate-600">{schemes[selectedScheme]?.eligibilityHint}</p>
             </div>
           </div>
         </section>
 
         <section className="grid gap-4 md:grid-cols-2">
-          {Object.entries(schemeConfig).map(([schemeName, config]) => (
+          {Object.entries(schemes).map(([schemeName, config]) => (
             <article
               key={schemeName}
               className={`rounded-[28px] border p-6 shadow-[0_14px_30px_rgba(15,23,42,0.08)] ${
@@ -107,6 +122,7 @@ function ApplySubsidyPage() {
           title="Scheme Application"
           initialValues={initialFormValues}
           documents={documents}
+          schemes={schemes}
           submitLabel={submitting ? "Submitting..." : "Submit Application"}
           onSubmit={handleCreate}
           disabled={submitting}

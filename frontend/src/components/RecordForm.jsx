@@ -54,6 +54,7 @@ function RecordForm({
   submitLabel,
   initialValues,
   documents = [],
+  schemes = schemeConfig,
   onSubmit,
   disabled = false,
   resetOnSubmit = false,
@@ -86,7 +87,8 @@ function RecordForm({
     }
   }, [documentsByType.aadhaar, form.aadhaarDocumentId]);
 
-  const selectedScheme = schemeConfig[form.schemeType];
+  const availableSchemes = Object.keys(schemes).length ? schemes : schemeConfig;
+  const selectedScheme = availableSchemes[form.schemeType] || Object.values(availableSchemes)[0];
   const missingRequiredDocuments = selectedScheme.requiredDocuments.filter(
     (type) => !(documentsByType[type] || []).length
   );
@@ -161,7 +163,7 @@ function RecordForm({
             disabled={disabled}
             required
           >
-            {Object.keys(schemeConfig).map((schemeName) => (
+            {Object.keys(availableSchemes).map((schemeName) => (
               <option key={schemeName} value={schemeName}>
                 {schemeName}
               </option>
