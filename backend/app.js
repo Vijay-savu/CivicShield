@@ -3,6 +3,7 @@ const cors = require("cors");
 const apiGateway = require("./gateway");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 const { requestShield, apiRateLimiter } = require("./middleware/securityMiddleware");
+const { getRuntimeState } = require("./utils/runtimeState");
 
 const app = express();
 const isLocalFrontend = (origin = "") => /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
@@ -28,10 +29,13 @@ app.use(express.urlencoded({ extended: false, limit: "1mb" }));
 app.use("/api", apiRateLimiter);
 
 app.get("/api/health", (req, res) => {
+  const runtimeState = getRuntimeState();
   res.json({
     status: "ok",
     service: "CivicShield verification backend",
     requestId: req.requestId,
+    databaseReady: runtimeState.databaseReady,
+    lastBootstrapError: runtimeState.lastBootstrapError,
   });
 });
 
